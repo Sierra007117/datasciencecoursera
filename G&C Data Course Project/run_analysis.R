@@ -1,68 +1,46 @@
-library(reshape2)
-
-## 1. Getting the data from the web and saving it 
-rawDataDir <- "./rawData"
-rawDataURL <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
-rawDataPath <- paste0(rawDataDir, "/rawData.zip")
-dataDir <- "./data"
-
-if (!file.exists(rawDataDir)){
-  # downloading data 
-  dir.create(rawDataDir)
-  download.file(url = rawDataURL, destfile = rawDataPath)
-}
-
-if(!file.exists(dataDir)){
-  #unziping data 
-  dir.create(dataDir)
-  unzip(rawDataPath, exdir = dataDir)
-}
+activity <- read.table("./activity_labels.txt", col.names = c("IDactivity", "activity"))
+features <- read.table("./features.txt", col.names = c("IDfeature", "feature"))
 
 
-## 2. Merging training and test sets
-# reading training sets 
-X_train <- read.table(paste0(dataDir, "/UCI HAR Dataset/train/X_train.txt"))
-y_train <- read.table(paste0(dataDir, "/UCI HAR Dataset/train/y_train.txt"))
-subject_train <- read.table(paste0(dataDir, "/UCI HAR Dataset/train/subject_train.txt"))
-
-# reading test sets 
-X_test <- read.table(paste0(dataDir, "/UCI HAR Dataset/test/X_test.txt"))
-y_test <- read.table(paste0(dataDir, "/UCI HAR Dataset/test/y_test.txt"))
-subject_test <- read.table(paste0(dataDir, "/UCI HAR Dataset/test/subject_test.txt"))
-
-# merging training and test set 
-X_data <- rbind(X_train, X_test)
-y_data <- rbind(y_train, y_test)
-subject_data <- rbind(subject_train, subject_test)
-
-## 3. Naming the features 
-# reading in features names
-features <- read.table(paste0(dataDir, "/UCI HAR Dataset/features.txt"))
-# naming features in the X_data 
-names(X_data) <- features$V2
+# Reading data from test folder
+subject_test <- read.table("./test/subject_test.txt", col.names = "subject")
+x_test <- read.table("./test/X_test.txt", col.names = features$feature)
+y_test <- read.table("./test/y_test.txt", col.names = "code")
 
 
-## 4. Extract measurements on the mean and the standard deviation for each measurment 
-extracted_col <- grep("mean\\(|std\\(", names(X_data))
-data <- X_data[extracted_col]
+#Reading data from train forlder
+subject_train <- read.table("./train/subject_train.txt", col.names = "subject")
+x_train <- read.table("./train/X_train.txt", col.names = features$feature)
+y_train <- read.table("./train/y_train.txt", col.names = "code")
 
 
-## 5. Using describtive activity names 
-labels <- read.table(paste0(dataDir, "/UCI HAR Dataset/activity_labels.txt"), stringsAsFactors = FALSE)
-data$activity <- factor(y_data$V1, levels=labels$V1, labels=labels$V2)
-data$subject <- as.factor(subject_data$V1)
-
-## 6. Appropiatly name the variables 
-names(data) <- gsub("-", "", names(data))
-names(data) <- gsub("\\(\\)", "", names(data))
-names(data) <- gsub("mean", "Mean", names(data))
-names(data) <- gsub("std", "Std", names(data))
+# Unimos los datos
+Xjoin <- rbind(x_test, x_train)
+Yjoin <- rbind(y_test, y_train)
+SubjectJoin <- rbind(subject_test, subject_train)
 
 
-## 7. Create a data set with the average of each variable for each activity and each subject 
-dataMelt <- melt(data, id = c("activity", "subject"))
-tidy_data <- dcast(dataMelt, activity + subject ~ variable, mean)
 
-#Saving the tidy data set 
-write.table(tidy_data, file = "tidy_data.txt", row.names = FALSE)
+#MergeData, First Data
+MergeData <- cbind(SubjectJoin, Yjoin, Xjoin)
+MergeData <- MergeData[,grepl("subject|code|mean|std", names(MergeData))]
 
+
+# Rename de the columns from DataMerge
+names(MergeData) <- gsub("Acc", "Accelerometer", names(MergeData))
+names(MergeData) <- gsub("Gyro", "Gyroscope", names(MergeData))
+names(MergeData) <- gsub("^t", "Time", names(MergeData))
+names(MergeData) <- gsub("^f", "Frequency", names(MergeData))
+names(MergeData) <- gsub("angle", "Angle", names(MergeData))
+names(MergeData) <- gsub("gravity", "Gravity", names(MergeData))
+names(MergeData) <- gsub("BodyBody", "Body", names(MergeData))
+names(MergeData)[2] <- "activity"
+
+
+#FinalData, Second Data
+library(dplyr)
+TidyData <- group_by(.data = MergeData, subject, activity)
+TidyData <- summarise_all(TidyData, funs(mean))
+
+
+write.table(x = TidyData, file = "FinalTidyData.txt",row.names = FALSE)
