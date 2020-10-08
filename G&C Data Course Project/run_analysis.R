@@ -1,46 +1,34 @@
-activity <- read.table("./activity_labels.txt", col.names = c("IDactivity", "activity"))
-features <- read.table("./features.txt", col.names = c("IDfeature", "feature"))
-
-
-# Reading data from test folder
-subject_test <- read.table("./test/subject_test.txt", col.names = "subject")
-x_test <- read.table("./test/X_test.txt", col.names = features$feature)
-y_test <- read.table("./test/y_test.txt", col.names = "code")
-
-
-#Reading data from train forlder
-subject_train <- read.table("./train/subject_train.txt", col.names = "subject")
-x_train <- read.table("./train/X_train.txt", col.names = features$feature)
-y_train <- read.table("./train/y_train.txt", col.names = "code")
-
-
-# Unimos los datos
-Xjoin <- rbind(x_test, x_train)
-Yjoin <- rbind(y_test, y_train)
-SubjectJoin <- rbind(subject_test, subject_train)
-
-
-
-#MergeData, First Data
-MergeData <- cbind(SubjectJoin, Yjoin, Xjoin)
-MergeData <- MergeData[,grepl("subject|code|mean|std", names(MergeData))]
-
-
-# Rename de the columns from DataMerge
-names(MergeData) <- gsub("Acc", "Accelerometer", names(MergeData))
-names(MergeData) <- gsub("Gyro", "Gyroscope", names(MergeData))
-names(MergeData) <- gsub("^t", "Time", names(MergeData))
-names(MergeData) <- gsub("^f", "Frequency", names(MergeData))
-names(MergeData) <- gsub("angle", "Angle", names(MergeData))
-names(MergeData) <- gsub("gravity", "Gravity", names(MergeData))
-names(MergeData) <- gsub("BodyBody", "Body", names(MergeData))
-names(MergeData)[2] <- "activity"
-
-
-#FinalData, Second Data
-library(dplyr)
-TidyData <- group_by(.data = MergeData, subject, activity)
-TidyData <- summarise_all(TidyData, funs(mean))
-
-
-write.table(x = TidyData, file = "FinalTidyData.txt",row.names = FALSE)
+datasetPath <- 'UCI HAR Dataset'
+downloadDataset <- function() {
+  url <- 'http://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip'
+  download.file(url, 'Dataset.zip')
+  unzip('Dataset.zip')
+}
+readMergedData <- function(file, name=FALSE) {
+  data <- data.frame()
+  for (folder in c('test', 'train')) {
+    filename <- sprintf('%s/%s/%s_%s.txt', datasetPath, folder, file, folder)
+    data <- rbind(data, read.table(filename))
+  }
+  if (name != FALSE) {
+    colnames(data) <- name
+  }
+  data
+}
+downloadDataset()
+dataFeatures <- read.table(sprintf('%s/features.txt', datasetPath))
+setColumnNames <- dataFeatures$V2
+dataLabels <- readMergedData('y', 'activity')
+dataSubjects <- readMergedData('subject', 'subject')
+dataset <- readMergedData('X', setColumnNames)
+activityLabels <- read.table(sprintf('%s/activity_labels.txt', datasetPath))
+dataset <- dataset[grepl("mean\\(\\)|std\\(\\)", setColumnNames)]
+dataset <- cbind(dataSubjects, dataLabels, dataset)
+dataset$activity <- activityLabels[dataset$activity, 2]
+write.table(dataset, "data.txt", sep="\t", row.names = FALSE)
+tidyDataset <- aggregate(dataset, by=list(dataset$subject, dataset$activity), FUN=mean)
+tidyDataset$activity <- NULL
+tidyDataset$subject <- NULL
+names(tidyDataset)[names(tidyDataset) == 'Group.1'] <- 'subject'
+names(tidyDataset)[names(tidyDataset) == 'Group.2'] <- 'activity'
+write.table(tidyDataset, "tidy_data.txt", sep="\t", row.names = FALSE)
