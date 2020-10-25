@@ -1,0 +1,149 @@
+---
+title: "Regression Models - Course Project"
+author: "Mahadi Sajjad"
+date: "2020"
+output:
+  pdf_document:
+    fig_height: 6
+    fig_width: 4.5
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Executive summary
+
+This paper explores the relationship between miles per US gallon and type of
+transmission, using the mtcars dataset in R.
+
+Our analysis showed that manual transmission is better than automatic in regards to
+MPG. While accounting for number of cylinders, horsepower and weight, cars with
+automatic tranmission have 1.8 higher MPG than those with manual.
+
+# Data pre-processing
+
+```{r preproc}
+my_data <- mtcars
+head(my_data)
+# Transform variables to factors where appropriate
+my_data$cyl <- factor(my_data$cyl)
+my_data$vs <- factor(my_data$vs)
+my_data$am <- factor(my_data$am, labels = c("auto", "man"))
+my_data$gear <- factor(my_data$gear, labels = c("3", "4", "5"))
+my_data$carb <- factor(my_data$carb)
+```
+
+# 1. Is an automatic or manual transmission better for MPG?
+
+Let's get a first idea about the difference in average MPG between automatic and
+manual transmissions:
+
+```{r agr}
+aggregate(my_data[, 1], list(my_data$am), mean)
+```
+
+There seems to be a clear difference (7.25 MPG) in the average mpg between automatic
+and manual transmission (see appendix for plot). Let's confirm it with a hypothesis test.
+
+H_0: There is no significant difference in mpg between auto and man trans.
+
+H_1: Automatic transmission is associated with lower values of mpg
+
+```{r ttest}
+t.test(mpg ~ am, data = my_data, paired = FALSE, alt = "less")$p.value
+t.test(mpg ~ am, data = my_data, paired = FALSE, alt = "less")$estimate
+```
+
+The p-value is 0.0007 which means that we reject the null at any reasonable
+significance level, i.e. Manual transmission is better for MPG.
+
+# 2. Quantify the MPG difference between types of transmission.
+
+We've fit several linear regression models to quantify the difference in MPG between automatic and manual type of transmission.
+
+The final model is shown below. The full model selection strategy and intermediate
+models can be found in the Appendix.
+
+```{r model3}
+mdl3 <- lm(mpg ~ cyl + hp + wt + am, data = my_data)
+summary(mdl3)$coef
+summary(mdl3)[8:9]
+```
+
+In addition to the type of transmission, this model takes into account the number
+of cylinders, horsepower and weight. The model can explain 87% of total variance
+in MPG. While keeping all other variables constant, MPG increases by 1.8 miles/gallon
+from automatic to manual transmission.
+
+# Diagnostics
+
+The results of the diagnostic tests are shown below. See Appendix for plots.
+
+1. The residual vs fitted plot does not reveal any non-linear or other patterns
+2. Testing the normality assumption - the qqplot is not a perfect straight line but does not appear to be concerning
+3. There is no evidence of heteroscedasticity from the scale-location plot
+4. All the residuals are within Cook's distance, so there's no reason to suspect
+   influential data points in the dataset.
+
+\newpage
+
+# Appendix
+
+##1. Boxplot of MPG by type of transmission
+
+```{r box, fig.height=4, fig.width=4}
+require(ggplot2)
+g <- ggplot(my_data, aes(x = am, y = mpg))
+g + geom_boxplot(aes(group = am), fill = "olivedrab1") +
+        xlab("transmission type") +
+        ylab("miles/(US) gallon") +
+        ggtitle("Miles/(US) gallon by type of transmission")
+```
+
+##2. Diagnostic plots for the final regression model
+
+```{r diag, fig.height=5, fig.width=6}
+par(mfrow = c(2,2))
+plot(mdl3)
+```
+
+##3. Model selection strategy and intermediate models
+
+**Model1**
+
+First try a simple linear regression model with MPG as the dependent variable
+and transmission type (am) as the independent.
+
+```{r model1}
+mdl1 <- lm(mpg ~ am, data = my_data)
+summary(mdl1)
+```
+
+From the summary we can see that am seems to have a significant effect on mpg
+(p-value < 0.05), and the difference in average MPG between the two levels of am
+(manual - auto) is 7.245, which matches the difference we've already observed. However,
+am alone does not appear to be enough to explain the variation in mpg, the R-squared
+is 0.3598, which means that this model can only explain 36% of the total variation
+in mpg. We will try to add some more independent variables to the model from the
+dataset to try and get a better fit.
+
+Let's have a look at the correlations between mpg and the other variables in the
+dataset. We'll try a model that includes variables that appear to be highly
+correlated with mpg. Let's pick arbitratily the variables that have an absolute
+correlation higher than 0.7 plus the am variable.
+
+**Model2**
+
+```{r model2}
+cor(mtcars, method = "pearson")[, "mpg"]
+mdl2 <- lm(mpg ~ cyl + disp + hp + wt + am, data = my_data)
+summary(mdl2)
+```
+
+Model 2 explains 87% of the variance and the adjusted R-squared is 83%. It
+is a much better fit than model 1, but includes independent variables that don't
+seem to have a significant effect (variables with p-value higher than 0.05).
+Transmission type doesn't seem to be significant in this model either. Let's try
+to remove variable "disp".
