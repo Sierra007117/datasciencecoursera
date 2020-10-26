@@ -1,0 +1,130 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+
+\#Import the data into RStudio
+
+repdata.data.StormData \textless-
+read.csv(``/home/sierra117/Documents/GitHub/datasciencecoursera/Reproducible
+Research Course Project 2repdata-data-StormData.csv.bz2'')
+View(repdata.data.StormData)
+
+data\textless-repdata.data.StormData
+
+\#Checking data library(plyr) nmissing \textless- function(x)
+sum(is.na(x)) colwise(nmissing)(data)
+
+\#Transfer the EVTYPE,PROPDMGEXP and CROPDMGEXP to uppercase for
+aggregation data\_Transfer \textless- mutate(data, EVTYPE =
+toupper(EVTYPE), PROPDMGEXP = toupper(PROPDMGEXP), CROPDMGEXP =
+toupper(CROPDMGEXP), BGN\_DATE = as.POSIXlt(data\$BGN\_DATE,
+format=``\%m/\%d/\%Y \%H:\%M:\%S''))
+
+\#Sum the FATALITIES and INJURIES Death\_Injury \textless- ddply(data,
+.(EVTYPE), summarize, Total\_Harm = sum(FATALITIES + INJURIES))
+Death\_Injury \textless-
+Death\_Injury{[}order(Death\_Injury\$Total\_Harm, decreasing = T), {]}
+Top\_Harm \textless- Death\_Injury{[}1:10, {]}
+
+\#Sum the PROPDMG and calculate real property damage Property\_Damage
+\textless- ddply(data, .(EVTYPE, PROPDMGEXP), summarize, PROPDMG =
+sum(PROPDMG)) Property\_Damage \textless- mutate(Property\_Damage,
+PropertyDamage = ifelse(toupper(PROPDMGEXP) ==`K', PROPDMG\emph{1000,
+ifelse(toupper(PROPDMGEXP) ==`M', PROPDMG}1000000,
+ifelse(toupper(PROPDMGEXP) == `B', PROPDMG\emph{1000000000,
+ifelse(toupper(PROPDMGEXP) == `H', PROPDMG}100, PROPDMG)))))
+Property\_Damage \textless- subset(Property\_Damage, select =
+c(``EVTYPE'', ``PropertyDamage'')) Property\_Damage\_total \textless-
+ddply(Property\_Damage, .(EVTYPE), summarize, TotalPropDamage =
+sum(PropertyDamage))
+
+\#Sum the CROPDMG and calculate real crop damage Crop\_Damage \textless-
+ddply(data, .(EVTYPE, CROPDMGEXP), summarize, CROPDMG = sum(CROPDMG))
+Crop\_Damage \textless- mutate(Crop\_Damage, CropDamage =
+ifelse(toupper(CROPDMGEXP) ==`K', CROPDMG\emph{1000,
+ifelse(toupper(CROPDMGEXP) ==`M', CROPDMG}1000000,
+ifelse(toupper(CROPDMGEXP) == `B', CROPDMG\emph{1000000000,
+ifelse(toupper(CROPDMGEXP) == `H', CROPDMG}100, CROPDMG)))))
+Crop\_Damage \textless- subset(Crop\_Damage, select = c(``EVTYPE'',
+``CropDamage'')) Crop\_Damage\_total \textless- ddply(Crop\_Damage,
+.(EVTYPE), summarize, TotalCropDamage = sum(CropDamage))
+
+\#Merge the property damage data and crop damage Damage \textless-
+merge(Property\_Damage\_total, Crop\_Damage\_total, by=``EVTYPE'')
+Damage \textless- mutate(Damage, TotalDamage = TotalPropDamage +
+TotalCropDamage) Damage \textless- Damage{[}order(Damage\$TotalDamage,
+decreasing = T), {]} Top\_Damage \textless- Damage{[}1:10, {]}
+
+library(ggplot2) plot1 \textless- qplot(EVTYPE, Total\_Harm, data =
+Top\_Harm, fill= EVTYPE,xlab=``Top 10
+events'',ylab=``Casualties'',main=``Casualties due to severe weather
+events\nin the U.S from 1950-2011'') plot1 + theme(axis.text.x =
+element\_text(angle = 45)) print(plot1)
+
+plot2 \textless- qplot(EVTYPE, TotalDamage, data = Top\_Damage, fill=
+EVTYPE,xlab=``Top 10 events'',ylab=``Economic damage'',main=``Economic
+damage due to severe weather events\nin the U.S from 1950-2011'') plot2
++ theme(axis.text.x = element\_text(angle = 45)) print(plot2)
+
+\end{document}
